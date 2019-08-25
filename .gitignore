@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+/Debug
+/.vs
+/BinaryTree.vcxproj.user
+/BinaryTree.vcxproj.filters
+/BinaryTree.vcxproj
+/BinaryTree.sln

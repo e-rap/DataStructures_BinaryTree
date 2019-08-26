@@ -2,6 +2,10 @@
 #include <vector>
 #include "BinaryTree.hpp"
 
+//TODO: DOCUMENTATION
+//TODO: Refactor code to remove BinaryTree Object for functions?
+//TODO: Clean up the code
+
 template<typename DataType>
 void VisitFunction(Node<DataType>* node)
 {

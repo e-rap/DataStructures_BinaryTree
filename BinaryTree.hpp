@@ -1,9 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 #include <functional>
 #include <deque>
 #include <iostream>
+#include <numeric>
 
 template <typename ElementType>
 class BinaryTree
@@ -12,13 +14,13 @@ public:
   class Node;
   using NodePtr = std::unique_ptr<Node>;
 
-  template <typename ContainerType>
-  class Builder;
-
   virtual ~BinaryTree();
   Node* getRootPtr() const;
   void insert(const ElementType& value);
-  Node* search(const ElementType& to_find, Node* starting_node = getRootPtr());
+
+  static Node* search(const ElementType& to_find, Node* starting_node);
+  template<typename ContainerType>
+  static std::unique_ptr<BinaryTree> build(const ContainerType& elements, const size_t num_elements);
 
 private:
   BinaryTree();
@@ -29,13 +31,14 @@ private:
 template <typename ElementType>
 class BinaryTree<ElementType>::Node
 {
+  using value_type = ElementType;
   friend class BinaryTree;
 
 public:
   Node(ElementType value) : value(value) {}
   Node* getLeft() { return unique_left.get(); }
   Node* getRight() { return unique_right.get(); }
-  Node* getValue() const { return value; }
+  ElementType getValue() const { return value; }
   void* setValue(ElementType& value) { this->value = value; }
 
 private:
@@ -76,7 +79,7 @@ void BinaryTree<ElementType>::insert(const ElementType& value)
 }
 
 template <typename ElementType>
-Node<ElementType>* BinaryTree<ElementType>::search(const ElementType& to_find, Node* starting_node)
+static Node<ElementType>* BinaryTree<ElementType>::search(const ElementType& to_find, Node* starting_node)
 {
   auto retVal{ find_position(to_find) };
   return (retVal == nullptr) ? nullptr : retVal.get();
@@ -85,7 +88,7 @@ Node<ElementType>* BinaryTree<ElementType>::search(const ElementType& to_find, N
 /* Private Function Definitions */
 
 template <typename ElementType>
-BinaryTree<ElementType>::BinaryTree() : root_ptr{}
+BinaryTree<ElementType>::BinaryTree() : root_ptr{ nullptr }
 {
 }
 
@@ -93,27 +96,25 @@ template <typename ElementType>
 typename BinaryTree<ElementType>::NodePtr& BinaryTree<ElementType>::find_position(const ElementType& value)
 {
   auto cur_node_ptr_ref{ std::ref(root_ptr) };
-  NodePtr& cur_node_ptr{ cur_node_ptr_ref };
-
-  while ((cur_node_ptr->left != nullptr) &&
-    (cur_node_ptr->right != nullptr))
+  while (cur_node_ptr_ref.get() != nullptr)
   {
+    NodePtr& cur_node_ptr{ cur_node_ptr_ref.get() };
     if (value == cur_node_ptr->value)
     {
       break;
     }
     else if (value < cur_node_ptr->value)
     {
-      cur_node_ptr_ref = std::ref(cur_node_ptr->left);
-      if (cur_node_ptr->left == nullptr)
+      cur_node_ptr_ref = std::ref(cur_node_ptr->unique_left);
+      if (cur_node_ptr->getLeft() == nullptr)
       {
         break;
       }
     }
     else // (value > cur_node_ptr->value)
     {
-      cur_node_ptr_ref = std::ref(cur_node_ptr->right);
-      if (cur_node_ptr->right == nullptr)
+      cur_node_ptr_ref = std::ref(cur_node_ptr->unique_right);
+      if (cur_node_ptr->getRight() == nullptr)
       {
         break;
       }
@@ -122,64 +123,50 @@ typename BinaryTree<ElementType>::NodePtr& BinaryTree<ElementType>::find_positio
   return cur_node_ptr_ref;
 }
 
-template <typename ContainerType>
-class Builder
-{
-public:
-  using ElementType = typename ContainerType::value_type;
-  static BinaryTree<ElementType> CreateBST(const ContainerType& elements,
-                                           const size_t num_elements);
-};
-
 template <typename ElementType>
 template <typename ContainerType>
-class BinaryTree<ElementType>::Builder
+static std::unique_ptr<BinaryTree<ElementType>> BinaryTree<ElementType>::build(const ContainerType& elements, const size_t num_elements)
 {
-  static std::unique_ptr<BinaryTree> build(const ContainerType& elements, const size_t num_elements)
+  struct MkUniqueEnablr : public BinaryTree<ElementType> {};
+  auto binary_tree_ptr{ std::make_unique<MkUniqueEnablr>() };
+  for (size_t i{ 0 }; i < num_elements; i++)
   {
-    auto binary_tree_ptr = std::make_unique<BinaryTree>();
-    for (int i{ 0 }; i < num_elements; i++)
-    {
-      binary_tree_ptr->insert(elements[i]);
-    }
-    return binary_tree_ptr;
+    binary_tree_ptr->insert(elements[i]);
   }
-};
-
-/* Assignment API Functoins */
-template <typename ContainerType>
-BinaryTree<typename ContainerType::value_type> CreateBST(const ContainerType& elements,
-                                                         const size_t num_elements)
-{
-  return BinaryTree<typename ContainerType::value_type>::Builder::build(elements, num_elements);
+  return binary_tree_ptr;
 }
 
-template <typename ElementType>
-Node<ElementType>* BSTSearch(
-  const BinaryTree<ElementType>& tree,
-  const ElementType& to_find)
+/* Assignment API Functions */
+
+template<typename ContainerType>
+std::unique_ptr<BinaryTree<typename ContainerType::value_type>> CreateBST(const ContainerType& elements,
+                                                                          const size_t num_elements)
 {
-  return tree.search(to_find);
+  using ElementType = ContainerType::value_type;
+  return std::move(BinaryTree<ElementType>::build(elements, num_elements));
 }
+
+
+
 
 namespace HelperFunctions
 {
-  template <typename ElementType, typename VisitFunction>
-  void InOrder(const Node<ElementType>* node, VisitFunction func)
+  template <typename Node, typename VisitFunction, typename... Args>
+  void InOrder(Node node, VisitFunction visit_func, Args&& ... args)
   {
     if (node != nullptr)
     {
-      InOrder(node->getLeft());
-      func();
-      InOrder(node->getRight());
+      InOrder(node->getLeft(), visit_func, std::forward<Args>(args)...);
+      visit_func(node, std::forward<Args>(args)...);
+      InOrder(node->getRight(), visit_func, std::forward<Args>(args)...);
     }
   }
 } // namespace HelperFunctions
 
-template <typename ElementType, typename VisitFunction = void()>
-void VisitInOrder(const Node<ElementType> * root)
+template <typename Node, typename VisitFunction, typename... Args>
+void VisitInOrder(Node root, VisitFunction visit_func, Args&& ... args)
 {
-  HelperFunctions::InOrder(root);
+  HelperFunctions::InOrder(root, visit_func, std::forward<Args>(args)...);
 }
 
 template <typename ElementType>
@@ -187,6 +174,29 @@ ElementType SumLeafNodes(const BinaryTree<ElementType>& tree)
 {
 }
 
+template <typename ElementType, typename Node>
+ElementType SumLeafNodes(Node root)
+{
+  std::vector<ElementType> node_list{};
+  auto leaf_node_list = [](Node node, std::vector<ElementType>& values)
+  {
+    if ((node->getLeft() == nullptr) && (node->getRight() == nullptr))
+    {
+      values.push_back(node->getValue());
+    }
+  };
+  VisitInOrder(root, leaf_node_list, node_list);
+  ElementType retVal{ std::accumulate(node_list.cbegin(), node_list.cend(), 0) };
+  return retVal;
+}
+
 // TODO
+template <typename ElementType>
+Node<ElementType>* BSTSearch(
+  const Node<ElementType>* root,
+  const ElementType& to_find)
+{
+  return BinaryTree<ElementType>::search(to_find, root);
+}
+
 //Node *BSTSearch(const Node *root, const ElementType &to_find);
-//ElementType SumLeafNodes(const BinaryTree *btree);

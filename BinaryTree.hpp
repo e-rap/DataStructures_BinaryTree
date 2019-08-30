@@ -7,25 +7,53 @@
 #include <iostream>
 #include <numeric>
 
+
+/** Binary tree data stucture. */
 template <typename ElementType>
 class BinaryTree
 {
 public:
+  /** Binary tree node class. */
   class Node;
+
   using NodePtr = std::unique_ptr<Node>;
 
+  /** Destructor. */
   virtual ~BinaryTree();
+
+  /** returns the root of the binary tree. */
   Node* getRootPtr() const;
+
+  /** inserts value into the binary tree. */
   void insert(const ElementType& value);
 
+  /**
+   * searches the binary tree for a given value.
+   *
+   * @param[in] to_find value to search for within the tree.
+   * @param[in] starting_node node to start searching from.
+   */
   static Node* search(const ElementType& to_find, Node* starting_node);
+
+  /**
+   * builder function to construct a binary tree from a given stl container.
+   *
+   * @param[in] elements container of values used to construct the tree.
+   * @param[in] num_elements the number of elements to use from the container.
+   */
   template<typename ContainerType>
   static std::unique_ptr<BinaryTree> build(const ContainerType& elements, const size_t num_elements);
 
 private:
-  BinaryTree();
-  NodePtr root_ptr;
+
+
+  /** Constructor. */
+  BinaryTree() = delete;
+
+  /** Helper function to find the position of value within the binary tree. */
   NodePtr& find_position(const ElementType& value);
+
+  NodePtr root_ptr; /**< pointer to the root node */
 };
 
 template <typename ElementType>
@@ -35,16 +63,29 @@ class BinaryTree<ElementType>::Node
   friend class BinaryTree;
 
 public:
+  /**
+   * Node constructor.
+   *
+   * @param[in] value to initalize the node with.
+   */
   Node(ElementType value) : value(value) {}
+
+  /** returns a raw pointer to the left node. */
   Node* getLeft() { return unique_left.get(); }
+
+  /** returns a raw pointer to the right node. */
   Node* getRight() { return unique_right.get(); }
+
+  /** returns the value of the node. */
   ElementType getValue() const { return value; }
+
+  /** sets the value of the node. */
   void* setValue(ElementType& value) { this->value = value; }
 
 private:
-  std::unique_ptr<Node> unique_left;
-  std::unique_ptr<Node> unique_right;
-  ElementType value;
+  std::unique_ptr<Node> unique_left;  ///< pointer to the left node
+  std::unique_ptr<Node> unique_right; ///< pointer to the right node
+  ElementType value;                  ///< value of the node
 };
 
 /* Public Function Definitions */
@@ -74,7 +115,10 @@ void BinaryTree<ElementType>::insert(const ElementType& value)
   else
   {
     NodePtr& node_ptr{ find_position(value) };
-    node_ptr = std::make_unique<Node>(value);
+    if (node_ptr == nullptr)
+    {
+      node_ptr = std::make_unique<Node>(value);
+    }
   }
 }
 
@@ -127,6 +171,8 @@ template <typename ElementType>
 template <typename ContainerType>
 static std::unique_ptr<BinaryTree<ElementType>> BinaryTree<ElementType>::build(const ContainerType& elements, const size_t num_elements)
 {
+  // TODO: talk to brandon about this
+  // MkUniqueEnablr allows me to call the private binary tree constructor
   struct MkUniqueEnablr : public BinaryTree<ElementType> {};
   auto binary_tree_ptr{ std::make_unique<MkUniqueEnablr>() };
   for (size_t i{ 0 }; i < num_elements; i++)
@@ -190,7 +236,7 @@ ElementType SumLeafNodes(Node root)
   return retVal;
 }
 
-// TODO
+// TODO: finish class API
 template <typename ElementType>
 Node<ElementType>* BSTSearch(
   const Node<ElementType>* root,

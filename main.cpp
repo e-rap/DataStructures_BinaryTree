@@ -2,7 +2,7 @@
 #include <vector>
 #include "BinaryTree.hpp"
 
-//TODO: DOCUMENTATION
+//TODO: Finish comment documentation
 //TODO: Refactor code to remove BinaryTree Object for functions?
 //TODO: Clean up the code
 

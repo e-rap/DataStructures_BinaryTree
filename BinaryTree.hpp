@@ -3,64 +3,80 @@
 #include <memory>
 #include <utility>
 #include <functional>
-#include <deque>
-#include <iostream>
 #include <numeric>
+#include <exception>
 
 
 /** Binary tree data stucture. */
-template <typename ElementType>
 class BinaryTree
 {
 public:
+  BinaryTree() = delete;
+  ~BinaryTree() = delete;
+
   /** Binary tree node class. */
+  template <typename ElementType>
   class Node;
 
-  using NodePtr = std::unique_ptr<Node>;
-
-  /** Destructor. */
-  virtual ~BinaryTree();
-
-  /** returns the root of the binary tree. */
-  Node* getRootPtr() const;
+  template <typename ElementType>
+  using NodePtr = std::unique_ptr<Node<ElementType>>;
 
   /** inserts value into the binary tree. */
-  void insert(const ElementType& value);
+  template<typename ElementType>
+  static void insert(Node<ElementType>* root, const ElementType& value);
 
   /**
    * searches the binary tree for a given value.
    *
+   * @param[in] root node to start searching from.
    * @param[in] to_find value to search for within the tree.
-   * @param[in] starting_node node to start searching from.
+   * @returns if found returns pointer to node containing value to_find, else nullptr.
    */
-  static Node* search(const ElementType& to_find, Node* starting_node);
+  template<typename ElementType>
+  static Node<ElementType>* search(Node<ElementType>* root, const typename ElementType& to_find);
 
   /**
-   * builder function to construct a binary tree from a given stl container.
+   * builds a binary tree structure of nodes from a given STL container of elements
    *
-   * @param[in] elements container of values used to construct the tree.
+   * @param[in] container of values used to construct the tree.
    * @param[in] num_elements the number of elements to use from the container.
+   * @returns a std::unique_ptr to the root node of the tree
    */
-  template<typename ContainerType>
-  static std::unique_ptr<BinaryTree> build(const ContainerType& elements, const size_t num_elements);
+  template<typename InputIt>
+  static std::unique_ptr<Node<typename InputIt::value_type>> build(const InputIt first, const InputIt last);
+
+  /**
+   * In order traversal of the binary tree data structure.
+   *
+   * @param[in] root root of the binary tree.
+   * @param[in] visit_func the function executed when visiting a node.
+   * @prama[in] args arguments for the function call.
+   */
+  template <typename Node_Ptr, typename VisitFunction, typename... Args>
+  static void InOrderTraversal(Node_Ptr root, VisitFunction visit_func, Args&& ... args);
 
 private:
 
+  /**
+   * Helper function to find the node positoin for the the value within the binary tree.
+   *
+   * @returns a reference to the node.
+   */
+  template<typename ElementType>
+  static Node<ElementType>* find_position(Node<ElementType>* root, const ElementType& value);
 
-  /** Constructor. */
-  BinaryTree() = delete;
-
-  /** Helper function to find the position of value within the binary tree. */
-  NodePtr& find_position(const ElementType& value);
-
-  NodePtr root_ptr; /**< pointer to the root node */
+  /**
+   * Inner helper function for recursive InOrder Traversal
+   */
+  template <typename Node_Ptr, typename VisitFunction, typename... Args>
+  static void InOrder(Node_Ptr node, VisitFunction visit_func, Args&& ... args);
 };
 
 template <typename ElementType>
-class BinaryTree<ElementType>::Node
+class BinaryTree::Node
 {
   using value_type = ElementType;
-  friend class BinaryTree;
+  friend BinaryTree;
 
 public:
   /**
@@ -88,161 +104,99 @@ private:
   ElementType value;                  ///< value of the node
 };
 
-/* Public Function Definitions */
 
 template <typename ElementType>
-using Node = typename BinaryTree<ElementType>::Node;
-
-template <typename ElementType>
-BinaryTree<ElementType>::~BinaryTree()
+void BinaryTree::insert(Node<ElementType>* root, const ElementType& value)
 {
-  root_ptr = nullptr;
-}
-
-template <typename ElementType>
-Node<ElementType>* BinaryTree<ElementType>::getRootPtr() const
-{
-  return root_ptr.get();
-}
-
-template <typename ElementType>
-void BinaryTree<ElementType>::insert(const ElementType& value)
-{
-  if (root_ptr == nullptr)
+  if (root != nullptr)
   {
-    root_ptr = std::make_unique<Node>(value);
+    Node<ElementType>* node_ptr{ find_position(root, value) };
+    if (node_ptr != nullptr)
+    {
+      if (value < node_ptr->getValue())
+      {
+        node_ptr->unique_left = std::make_unique<Node<ElementType>>(value);
+      }
+      else
+      {
+        node_ptr->unique_right = std::make_unique<Node<ElementType>>(value);
+      }
+    }
+    else
+    {
+      // Node with value exists do nothing
+    }
   }
   else
   {
-    NodePtr& node_ptr{ find_position(value) };
-    if (node_ptr == nullptr)
-    {
-      node_ptr = std::make_unique<Node>(value);
-    }
+    throw std::exception("Error: input root is not initialized");
   }
 }
 
 template <typename ElementType>
-static Node<ElementType>* BinaryTree<ElementType>::search(const ElementType& to_find, Node* starting_node)
+BinaryTree::Node<ElementType>* BinaryTree::search(Node<ElementType>* root, const typename ElementType& to_find)
 {
-  auto retVal{ find_position(to_find) };
-  return (retVal == nullptr) ? nullptr : retVal.get();
+  auto retVal{ find_position(root, to_find) };
+  return (retVal == nullptr) ? nullptr : retVal;
+}
+
+template <typename InputIt>
+static std::unique_ptr<BinaryTree::Node<typename InputIt::value_type>> BinaryTree::build(const InputIt first, const InputIt last)
+{
+  using ElementType = typename InputIt::value_type;
+  auto iterator{ first };
+
+  // insert first value into the root node
+  auto root_ptr{ std::make_unique<BinaryTree::Node<ElementType>>(*iterator) };
+
+  // fill in the rest of the values
+  while (iterator != last)
+  {
+    BinaryTree::insert<ElementType>(root_ptr.get(), *iterator);
+    ++iterator;
+  }
+  return root_ptr;
+}
+
+template<typename Node_Ptr, typename VisitFunction, typename ...Args>
+void BinaryTree::InOrderTraversal(Node_Ptr root, VisitFunction visit_func, Args&& ...args)
+{
+  InOrder(root, visit_func, std::forward<Args>(args)...);
 }
 
 /* Private Function Definitions */
 
 template <typename ElementType>
-BinaryTree<ElementType>::BinaryTree() : root_ptr{ nullptr }
+typename BinaryTree::Node<ElementType>* BinaryTree::find_position(Node<ElementType>* root, const ElementType& value)
 {
-}
-
-template <typename ElementType>
-typename BinaryTree<ElementType>::NodePtr& BinaryTree<ElementType>::find_position(const ElementType& value)
-{
-  auto cur_node_ptr_ref{ std::ref(root_ptr) };
-  while (cur_node_ptr_ref.get() != nullptr)
+  auto cur_node_ptr{ root };
+  auto return_ptr{ root };
+  while (cur_node_ptr != nullptr)
   {
-    NodePtr& cur_node_ptr{ cur_node_ptr_ref.get() };
+    return_ptr = cur_node_ptr;
     if (value == cur_node_ptr->value)
     {
       break;
     }
     else if (value < cur_node_ptr->value)
     {
-      cur_node_ptr_ref = std::ref(cur_node_ptr->unique_left);
-      if (cur_node_ptr->getLeft() == nullptr)
-      {
-        break;
-      }
+      cur_node_ptr = cur_node_ptr->getLeft();
     }
     else // (value > cur_node_ptr->value)
     {
-      cur_node_ptr_ref = std::ref(cur_node_ptr->unique_right);
-      if (cur_node_ptr->getRight() == nullptr)
-      {
-        break;
-      }
+      cur_node_ptr = cur_node_ptr->getRight();
     }
   }
-  return cur_node_ptr_ref;
+  return return_ptr;
 }
 
-template <typename ElementType>
-template <typename ContainerType>
-static std::unique_ptr<BinaryTree<ElementType>> BinaryTree<ElementType>::build(const ContainerType& elements, const size_t num_elements)
+template <typename Node_Ptr, typename VisitFunction, typename... Args>
+void BinaryTree::InOrder(Node_Ptr node, VisitFunction visit_func, Args&& ... args)
 {
-  // TODO: talk to brandon about this
-  // MkUniqueEnablr allows me to call the private binary tree constructor
-  struct MkUniqueEnablr : public BinaryTree<ElementType> {};
-  auto binary_tree_ptr{ std::make_unique<MkUniqueEnablr>() };
-  for (size_t i{ 0 }; i < num_elements; i++)
+  if (node != nullptr)
   {
-    binary_tree_ptr->insert(elements[i]);
+    InOrder(node->getLeft(), visit_func, std::forward<Args>(args)...);
+    visit_func(node, std::forward<Args>(args)...);
+    InOrder(node->getRight(), visit_func, std::forward<Args>(args)...);
   }
-  return binary_tree_ptr;
 }
-
-/* Assignment API Functions */
-
-template<typename ContainerType>
-std::unique_ptr<BinaryTree<typename ContainerType::value_type>> CreateBST(const ContainerType& elements,
-                                                                          const size_t num_elements)
-{
-  using ElementType = ContainerType::value_type;
-  return std::move(BinaryTree<ElementType>::build(elements, num_elements));
-}
-
-
-
-// TODO: Make Non-Recursive InOrder Function
-namespace HelperFunctions
-{
-  template <typename Node, typename VisitFunction, typename... Args>
-  void InOrder(Node node, VisitFunction visit_func, Args&& ... args)
-  {
-    if (node != nullptr)
-    {
-      InOrder(node->getLeft(), visit_func, std::forward<Args>(args)...);
-      visit_func(node, std::forward<Args>(args)...);
-      InOrder(node->getRight(), visit_func, std::forward<Args>(args)...);
-    }
-  }
-} // namespace HelperFunctions
-
-template <typename Node, typename VisitFunction, typename... Args>
-void VisitInOrder(Node root, VisitFunction visit_func, Args&& ... args)
-{
-  HelperFunctions::InOrder(root, visit_func, std::forward<Args>(args)...);
-}
-
-template <typename ElementType>
-ElementType SumLeafNodes(const BinaryTree<ElementType>& tree)
-{
-}
-
-template <typename ElementType, typename Node>
-ElementType SumLeafNodes(Node root)
-{
-  std::vector<ElementType> node_list{};
-  auto leaf_node_list = [](Node node, std::vector<ElementType>& values)
-  {
-    if ((node->getLeft() == nullptr) && (node->getRight() == nullptr))
-    {
-      values.push_back(node->getValue());
-    }
-  };
-  VisitInOrder(root, leaf_node_list, node_list);
-  ElementType retVal{ std::accumulate(node_list.cbegin(), node_list.cend(), 0) };
-  return retVal;
-}
-
-// TODO: finish class API
-template <typename ElementType>
-Node<ElementType>* BSTSearch(
-  const Node<ElementType>* root,
-  const ElementType& to_find)
-{
-  return BinaryTree<ElementType>::search(to_find, root);
-}
-
-//Node *BSTSearch(const Node *root, const ElementType &to_find);

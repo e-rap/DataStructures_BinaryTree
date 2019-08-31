@@ -1,36 +1,22 @@
 #include <iostream>
 #include <vector>
+#include "AssignmentFunctions.h"
 #include "BinaryTree.hpp"
 
-//TODO: Finish comment documentation
-//TODO: Refactor code to remove BinaryTree Object for functions?
-//TODO: Clean up the code
-
-template<typename DataType>
-void VisitFunction(Node<DataType>* node)
-{
-  std::cout << node->getValue();
-}
 
 int main()
 {
   using ElementType = int32_t;
   using ContainerType = std::vector<ElementType>;
-  std::vector<ElementType> test_input{ 4, 2, 6, 3 ,1, 5, 7 };
-  auto binary_tree = CreateBST(test_input, test_input.size());
 
-  std::vector<ElementType> values{};
-  auto node_list = [](Node<ElementType>* node, std::vector<ElementType>& values) {values.push_back(node->getValue()); };
+  ContainerType test_input{ 4, 2, 6, 3 ,1, 5, 7 };
+  auto unique_root_ptr = CreateBST(test_input, test_input.size());
+  auto root_ptr = unique_root_ptr.get();
 
-  VisitInOrder(binary_tree->getRootPtr(), node_list, values);
+  std::cout << "Binary tree in order traversal: ";
+  VisitInOrder(root_ptr);
 
-  for (auto val : values)
-  {
-    std::cout << val << " ";
-  }
-
-
-  auto leaf_node_sum{ SumLeafNodes<ElementType>(binary_tree->getRootPtr()) };
+  std::cout << "Sum of leaf nodes: " << SumLeafNodes(root_ptr) << "\n";
 
   return 0;
 }

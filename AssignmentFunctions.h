@@ -55,7 +55,7 @@ ElementType SumLeafNodes(BinaryTree::Node<ElementType>* root)
     }
   } };
   BinaryTree::InOrderTraversal(root, leaf_node_list, values);
-  return std::accumulate(values.cbegin(), values.cend(), 0);
+  return std::accumulate(values.cbegin(), values.cend(), ElementType{ 0 });
 }
 
 /**

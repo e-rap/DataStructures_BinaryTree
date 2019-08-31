@@ -148,6 +148,7 @@ static std::unique_ptr<BinaryTree::Node<typename InputIt::value_type>> BinaryTre
 
   // insert first value into the root node
   auto root_ptr{ std::make_unique<BinaryTree::Node<ElementType>>(*iterator) };
+  ++iterator;
 
   // fill in the rest of the values
   while (iterator != last)
@@ -176,7 +177,7 @@ typename BinaryTree::Node<ElementType>* BinaryTree::find_position(Node<ElementTy
     return_ptr = cur_node_ptr;
     if (value == cur_node_ptr->value)
     {
-      break;
+      return_ptr = nullptr;
     }
     else if (value < cur_node_ptr->value)
     {
